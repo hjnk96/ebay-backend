@@ -1,9 +1,11 @@
 require("dotenv").config();
 const express = require("express");
+const cors = require("cors"); // ✅ Step 1: Import CORS
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(cors()); // ✅ Step 2: Enable CORS for all origins (for now)
 app.use(express.json());
 
 // POST request to optimize eBay listing (using dummy data)
@@ -20,8 +22,12 @@ app.post("/optimize-listing-url", async (req, res) => {
     description: "Here’s the optimized description based on the eBay URL you provided."
   };
 
-  // Simulating a success response with dummy data
   res.json({ response: dummyOptimizedListing });
+});
+
+// Optional health check route
+app.get("/", (req, res) => {
+  res.send("Backend is running!");
 });
 
 app.listen(port, () => {
