@@ -9,13 +9,13 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// 🔑 Setup OpenAI
+// Setup OpenAI
 const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY, // Make sure it's set on Render!
+  apiKey: process.env.OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
 
-// 🧠 AI-powered route
+// POST request to optimize eBay listing
 app.post("/optimize-listing-url", async (req, res) => {
   const ebayUrl = req.body.ebayUrl;
 
@@ -25,38 +25,39 @@ app.post("/optimize-listing-url", async (req, res) => {
 
   try {
     const prompt = `
-You are an expert eBay listing optimizer. Given this eBay URL:
-${ebayUrl}
+You are an expert in online sales optimization.
 
-Generate a compelling eBay title and description to help it sell better. Be concise, keyword-rich, and professional.
-`;
+Given this eBay product listing URL: ${ebayUrl}
 
-    const response = await openai.createChatCompletion({
+Generate:
+1. An optimized, eye-catching title (max 80 characters)
+2. A professional, engaging product description (max 600 characters)
+
+Return the result in this JSON format:
+{
+  "title": "...",
+  "description": "..."
+}
+    `.trim();
+
+    const completion = await openai.createChatCompletion({
       model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 300,
+      messages: [
+        { role: "system", content: "You are a helpful eBay listing optimizer." },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const aiText = response.data.choices[0].message.content;
+    const textResponse = completion.data.choices[0].message.content;
+    const parsed = JSON.parse(textResponse);
 
-    // Basic split into title and description
-    const [titleLine, ...descLines] = aiText.split("\n").filter(Boolean);
-    const title = titleLine.replace(/^Title:\s*/i, "").trim();
-    const description = descLines.join("\n").replace(/^Description:\s*/i, "").trim();
-
-    res.json({
-      response: {
-        title,
-        description,
-      },
-    });
-  } catch (error) {
-    console.error("OpenAI error:", error);
-    res.status(500).json({ error: "Failed to generate listing. Try again later." });
+    res.json({ response: parsed });
+  } catch (err) {
+    console.error("Error generating AI response:", err);
+    res.status(500).json({ error: "Failed to generate optimized listing" });
   }
 });
 
-// Optional health check
 app.get("/", (req, res) => {
   res.send("Backend is running!");
 });
