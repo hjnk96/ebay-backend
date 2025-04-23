@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { Configuration, OpenAIApi } = require("openai");
+const OpenAI = require("openai"); // updated for SDK v4.x
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -10,10 +10,9 @@ app.use(cors());
 app.use(express.json());
 
 // Setup OpenAI
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(configuration);
 
 // POST request to optimize eBay listing
 app.post("/optimize-listing-url", async (req, res) => {
@@ -40,7 +39,7 @@ Return the result in this JSON format:
 }
     `.trim();
 
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: "You are a helpful eBay listing optimizer." },
@@ -48,7 +47,7 @@ Return the result in this JSON format:
       ],
     });
 
-    const textResponse = completion.data.choices[0].message.content;
+    const textResponse = completion.choices[0].message.content;
     const parsed = JSON.parse(textResponse);
 
     res.json({ response: parsed });
