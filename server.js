@@ -8,7 +8,7 @@ const cors = require("cors");
 const { OpenAI } = require("openai");  // Destructure OpenAI correctly for SDK v4.x
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;  // Render sets the PORT automatically
 
 app.use(cors());
 app.use(express.json());
