@@ -1,13 +1,12 @@
 require("dotenv").config();
-
-console.log('Loaded OpenAI API Key:', process.env.OPENAI_API_KEY ? "✔️" : "❌");
-
 const express = require("express");
 const cors = require("cors");
-const OpenAI = require("openai");  // ✅ Correct import for OpenAI SDK v4
+const OpenAI = require("openai");
+const axios = require("axios");
+const cheerio = require("cheerio");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
@@ -15,6 +14,57 @@ app.use(express.json());
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Helper function to fetch and scrape the eBay page content
+const scrapeEbayPage = async (url) => {
+  try {
+    console.log("Fetching eBay page:", url); // Log URL
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+
+    // Scrape boat details from eBay page
+    const makeModel = $("h1 span span[itemprop='name']").text() || "Need to Add!";
+    const rrp = $("span#mm-saleDscPrc").text() || "Need to Add!";
+    const engines = $("li[data-id='engine']").text() || "Need to Add!";
+    const length = $("li[data-id='length']").text() || "Need to Add!";
+    const fuel = $("li[data-id='fuel']").text() || "Need to Add!";
+    const speed = $("li[data-id='speed']").text() || "Need to Add!";
+    const condition = $("div.item-condition span").text() || "Need to Add!";
+    const accessoriesExtras = $("li[data-id='accessories']").text() || "Need to Add!";
+    const trailer = $("li[data-id='trailer']").text() || "Need to Add!";
+    const additional = $("div#desc_ifr").text() || "Need to Add!";
+
+    // Log the scraped boat details
+    console.log("Scraped Boat Details:", {
+      makeModel,
+      rrp,
+      engines,
+      length,
+      fuel,
+      speed,
+      condition,
+      accessoriesExtras,
+      trailer,
+      additional
+    });
+
+    return {
+      makeModel,
+      rrp,
+      engines,
+      length,
+      fuel,
+      speed,
+      condition,
+      accessoriesExtras,
+      trailer,
+      additional,
+    };
+  } catch (error) {
+    console.error("Error fetching or scraping eBay page:", error);
+    throw new Error("Failed to scrape eBay page.");
+  }
+};
 
 app.post("/optimize-listing-url", async (req, res) => {
   const ebayUrl = req.body.ebayUrl;
@@ -24,44 +74,10 @@ app.post("/optimize-listing-url", async (req, res) => {
   }
 
   try {
+    // Step 1: Scrape eBay page content
+    const boatDetails = await scrapeEbayPage(ebayUrl);
+    console.log("Scraped Boat Details:", boatDetails); // Log scraped details
+
+    // Step 2: Create the prompt for OpenAI with scraped data
     const prompt = `
-You are an expert in online sales optimization.
-
-Given this eBay product listing URL: ${ebayUrl}
-
-Generate:
-1. An optimized, eye-catching title (max 80 characters)
-2. A professional, engaging product description (max 600 characters)
-
-Return the result in this JSON format:
-{
-  "title": "...",
-  "description": "..."
-}
-    `.trim();
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: "You are a helpful eBay listing optimizer." },
-        { role: "user", content: prompt },
-      ],
-    });
-
-    const textResponse = completion.choices[0].message.content;
-    const parsed = JSON.parse(textResponse);
-
-    res.json({ response: parsed });
-  } catch (err) {
-    console.error("Error generating AI response:", err);
-    res.status(500).json({ error: "Failed to generate optimized listing" });
-  }
-});
-
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
-});
-
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+You are an expert boat listi
