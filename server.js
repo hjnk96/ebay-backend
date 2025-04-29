@@ -15,7 +15,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Helper to scrape eBay
+// Scraper function
 const scrapeEbayPage = async (url) => {
   try {
     const response = await axios.get(url);
@@ -48,7 +48,7 @@ const scrapeEbayPage = async (url) => {
   }
 };
 
-// API endpoint
+// Main endpoint
 app.post("/optimize-listing-url", async (req, res) => {
   const ebayUrl = req.body.ebayUrl;
 
@@ -81,7 +81,6 @@ Respond with a JSON in the format: { "title": "...", "description": "..." }
 
     const text = chatResponse.choices[0].message.content.trim();
 
-    // Try to safely parse the result
     let result;
     try {
       result = JSON.parse(text);
@@ -89,7 +88,8 @@ Respond with a JSON in the format: { "title": "...", "description": "..." }
       return res.status(500).json({ error: "Failed to parse OpenAI response", raw: text });
     }
 
-    return res.json({ ...result, scraped });
+    // Flatten the response so frontend can access everything
+    return res.json({ ...result, ...scraped });
 
   } catch (err) {
     console.error("Error:", err.message);
