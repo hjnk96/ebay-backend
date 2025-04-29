@@ -15,38 +15,21 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Helper function to fetch and scrape the eBay page content
+// Helper to scrape eBay
 const scrapeEbayPage = async (url) => {
   try {
-    console.log("Fetching eBay page:", url); // Log URL
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
 
-    // Scrape boat details from eBay page
-    const makeModel = $("h1 span span[itemprop='name']").text() || "Need to Add!";
-    const rrp = $("span#mm-saleDscPrc").text() || "Need to Add!";
-    const engines = $("li[data-id='engine']").text() || "Need to Add!";
-    const length = $("li[data-id='length']").text() || "Need to Add!";
-    const fuel = $("li[data-id='fuel']").text() || "Need to Add!";
-    const speed = $("li[data-id='speed']").text() || "Need to Add!";
-    const condition = $("div.item-condition span").text() || "Need to Add!";
-    const accessoriesExtras = $("li[data-id='accessories']").text() || "Need to Add!";
-    const trailer = $("li[data-id='trailer']").text() || "Need to Add!";
-    const additional = $("div#desc_ifr").text() || "Need to Add!";
-
-    // Log the scraped boat details to see what we're getting
-    console.log("Scraped Boat Details:", {
-      makeModel,
-      rrp,
-      engines,
-      length,
-      fuel,
-      speed,
-      condition,
-      accessoriesExtras,
-      trailer,
-      additional
-    });
+    const makeModel = $("h1 span span[itemprop='name']").text() || "Unknown model";
+    const rrp = $("span#mm-saleDscPrc").text() || "Not listed";
+    const engines = $("li[data-id='engine']").text() || "Not listed";
+    const length = $("li[data-id='length']").text() || "Not listed";
+    const fuel = $("li[data-id='fuel']").text() || "Not listed";
+    const speed = $("li[data-id='speed']").text() || "Not listed";
+    const condition = $("div.item-condition span").text() || "Unknown";
+    const accessoriesExtras = $("li[data-id='accessories']").text() || "Not listed";
+    const trailer = $("li[data-id='trailer']").text() || "Not listed";
 
     return {
       makeModel,
@@ -57,62 +40,60 @@ const scrapeEbayPage = async (url) => {
       speed,
       condition,
       accessoriesExtras,
-      trailer,
-      additional,
+      trailer
     };
-  } catch (error) {
-    console.error("Error fetching or scraping eBay page:", error);
+  } catch (err) {
+    console.error("Scraping error:", err.message);
     throw new Error("Failed to scrape eBay page.");
   }
 };
 
+// API endpoint
 app.post("/optimize-listing-url", async (req, res) => {
   const ebayUrl = req.body.ebayUrl;
 
   if (!ebayUrl) {
-    return res.status(400).json({ error: "eBay URL is required" });
+    return res.status(400).json({ error: "eBay URL is required." });
   }
 
   try {
-    // Step 1: Scrape eBay page content
-    const boatDetails = await scrapeEbayPage(ebayUrl);
-    console.log("Scraped Boat Details:", boatDetails); // Log scraped details
+    const scraped = await scrapeEbayPage(ebayUrl);
 
-    // Step 2: Create the prompt for OpenAI with scraped data
-    const prompt = `
-You are an expert boat listing optimizer. Your task is to enhance the content of an eBay boat listing based on the provided information. Make the title and description more compelling, professional, and persuasive.
+    const prompt = `You are a professional boat listing copywriter. Based on the following details, write a compelling eBay listing title and description:\n\n
+Make & Model: ${scraped.makeModel}
+RRP: ${scraped.rrp}
+Engine(s): ${scraped.engines}
+Length: ${scraped.length}
+Fuel: ${scraped.fuel}
+Speed: ${scraped.speed}
+Condition: ${scraped.condition}
+Accessories/Extras: ${scraped.accessoriesExtras}
+Trailer: ${scraped.trailer}
 
-Boat Details:
-Make & Model: ${boatDetails.makeModel}
-RRP: ${boatDetails.rrp}
-Engines: ${boatDetails.engines}
-Length: ${boatDetails.length}
-Fuel Type: ${boatDetails.fuel}
-Speed: ${boatDetails.speed}
-Condition: ${boatDetails.condition}
-Accessories/Extras: ${boatDetails.accessoriesExtras}
-Trailer: ${boatDetails.trailer}
-Additional Information: ${boatDetails.additional}
+Respond with a JSON in the format: { "title": "...", "description": "..." }
+`;
 
-Optimized Title and Description:`;
-
-    // Step 3: Request OpenAI to optimize the title and description
-    const optimizationResponse = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const chatResponse = await openai.chat.completions.create({
+      model: "gpt-4",
       messages: [{ role: "user", content: prompt }],
+      temperature: 0.7
     });
 
-    // Step 4: Extract the optimized title and description
-    const optimizedContent = optimizationResponse.choices[0].message.content;
-    console.log("Optimized Content:", optimizedContent);
+    const text = chatResponse.choices[0].message.content.trim();
 
-    // Step 5: Send back the optimized title and description
-    res.json({
-      optimizedTitleAndDescription: optimizedContent,
-    });
-  } catch (error) {
-    console.error("Error during the optimization process:", error);
-    res.status(500).json({ error: "Failed to optimize listing" });
+    // Try to safely parse the result
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (err) {
+      return res.status(500).json({ error: "Failed to parse OpenAI response", raw: text });
+    }
+
+    return res.json({ ...result, scraped });
+
+  } catch (err) {
+    console.error("Error:", err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 
