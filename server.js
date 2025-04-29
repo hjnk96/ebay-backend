@@ -34,7 +34,7 @@ const scrapeEbayPage = async (url) => {
     const trailer = $("li[data-id='trailer']").text() || "Need to Add!";
     const additional = $("div#desc_ifr").text() || "Need to Add!";
 
-    // Log the scraped boat details
+    // Log the scraped boat details to see what we're getting
     console.log("Scraped Boat Details:", {
       makeModel,
       rrp,
@@ -80,71 +80,40 @@ app.post("/optimize-listing-url", async (req, res) => {
 
     // Step 2: Create the prompt for OpenAI with scraped data
     const prompt = `
-You are an expert boat listing optimizer.
+You are an expert boat listing optimizer. Your task is to enhance the content of an eBay boat listing based on the provided information. Make the title and description more compelling, professional, and persuasive.
 
-Here are the boat details scraped from an eBay page:
-
-Make/Model: ${boatDetails.makeModel}
-RRP (£): ${boatDetails.rrp}
+Boat Details:
+Make & Model: ${boatDetails.makeModel}
+RRP: ${boatDetails.rrp}
 Engines: ${boatDetails.engines}
 Length: ${boatDetails.length}
-Fuel: ${boatDetails.fuel}
+Fuel Type: ${boatDetails.fuel}
 Speed: ${boatDetails.speed}
 Condition: ${boatDetails.condition}
 Accessories/Extras: ${boatDetails.accessoriesExtras}
 Trailer: ${boatDetails.trailer}
-Additional: ${boatDetails.additional}
+Additional Information: ${boatDetails.additional}
 
-⚡ If any field is missing, write "Need to Add!" next to it.
+Optimized Title and Description:`;
 
-Return the result in this JSON format:
-{
-  "makeModel": "...",
-  "rrp": "...",
-  "engines": "...",
-  "length": "...",
-  "fuel": "...",
-  "speed": "...",
-  "condition": "...",
-  "accessoriesExtras": "...",
-  "trailer": "...",
-  "additional": "..."
-}
-    `.trim();
-
-    console.log("Prompt for OpenAI:", prompt); // Log prompt before sending
-
-    // Step 3: Ask OpenAI to optimize the boat listing based on the scraped details
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // you can use "gpt-4" for richer results
-      messages: [
-        { role: "system", content: "You are a helpful assistant that optimizes boat listings based on extracted details." },
-        { role: "user", content: prompt },
-      ],
+    // Step 3: Request OpenAI to optimize the title and description
+    const optimizationResponse = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const textResponse = completion.choices[0].message.content;
-    console.log("AI response:", textResponse); // Log AI response
+    // Step 4: Extract the optimized title and description
+    const optimizedContent = optimizationResponse.choices[0].message.content;
+    console.log("Optimized Content:", optimizedContent);
 
-    let parsed;
-    try {
-      parsed = JSON.parse(textResponse);
-    } catch (parseError) {
-      console.error("Error parsing AI response:", parseError);
-      console.error("AI raw response:", textResponse);
-      return res.status(500).json({ error: "Failed to parse AI response." });
-    }
-
-    // Step 4: Send back the optimized response
-    res.json({ response: parsed });
-  } catch (err) {
-    console.error("Error generating AI response:", err);
-    res.status(500).json({ error: "Failed to generate optimized listing" });
+    // Step 5: Send back the optimized title and description
+    res.json({
+      optimizedTitleAndDescription: optimizedContent,
+    });
+  } catch (error) {
+    console.error("Error during the optimization process:", error);
+    res.status(500).json({ error: "Failed to optimize listing" });
   }
-});
-
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
 });
 
 app.listen(port, () => {
